@@ -5,10 +5,10 @@ const logger = require('./utils/logger');
 require('dotenv').config();
 
 let client = null;
-let currentQR = null;           // base64 PNG of latest QR
-let connectionStatus = 'disconnected'; // disconnected | qr_ready | connecting | connected | auth_failure
-let connectedInfo = null;       // { name, phoneNumber, platform }
-const wsClients = new Set();    // WebSocket connections to broadcast to
+let currentQR = null;
+let connectionStatus = 'disconnected';
+let connectedInfo = null;
+const wsClients = new Set();
 
 function broadcast(event, data) {
   const payload = JSON.stringify({ event, data });
@@ -20,7 +20,6 @@ function broadcast(event, data) {
 function registerWsClient(ws) {
   wsClients.add(ws);
   ws.on('close', () => wsClients.delete(ws));
-  // Immediately push current state to newly connected browser tab
   ws.send(JSON.stringify({ event: 'status', data: getStatus() }));
   if (currentQR) {
     ws.send(JSON.stringify({ event: 'qr', data: { qr: currentQR } }));
@@ -35,7 +34,7 @@ function getClient() {
   return client;
 }
 
-async function initClient() {
+async function initClient(onMessage) {
   if (client) return;
 
   const sessionPath = path.resolve(process.env.SESSION_DATA_PATH || '.wwebjs_auth');
@@ -75,7 +74,6 @@ async function initClient() {
   client.on('authenticated', () => {
     currentQR = null;
     connectionStatus = 'connecting';
-    logger.info('Authenticated successfully');
     broadcast('status', getStatus());
   });
 
@@ -93,7 +91,6 @@ async function initClient() {
       connectedInfo = {
         name: info.pushname || 'Unknown',
         phoneNumber: info.wid?.user || 'Unknown',
-        platform: info.platform || 'Unknown',
       };
     } catch {
       connectedInfo = {};
@@ -102,13 +99,17 @@ async function initClient() {
     broadcast('status', getStatus());
   });
 
+  // Live message listener — fires for every incoming message
+  client.on('message', async (message) => {
+    if (onMessage) onMessage(message);
+  });
+
   client.on('disconnected', (reason) => {
     connectionStatus = 'disconnected';
     connectedInfo = null;
     currentQR = null;
     logger.warn(`WhatsApp disconnected: ${reason}`);
     broadcast('status', getStatus());
-    // Allow reinit on next request
     client = null;
   });
 

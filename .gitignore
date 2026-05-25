@@ -8,6 +8,9 @@
 # Exported messages (your personal data)
 exports/
 
+# Live listener output (Excel + temp media)
+output/
+
 # Dependencies
 node_modules/
 client/node_modules/

@@ -1,34 +1,37 @@
 const express = require('express');
 const router = express.Router();
 const { getClient, getStatus } = require('../whatsappClient');
+const { setSelectedChats, getSelectedChats } = require('../services/listenerService');
 const logger = require('../utils/logger');
 
-// GET /api/chats
+// GET /api/chats — list all chats
 router.get('/chats', async (_req, res) => {
   const { status } = getStatus();
   if (status !== 'connected') {
     return res.status(503).json({ error: 'WhatsApp not connected', status });
   }
-
-  const client = getClient();
   try {
-    const chats = await client.getChats();
-    const simplified = chats.map((chat) => ({
-      id: chat.id._serialized,
-      name: chat.name || chat.id.user,
-      isGroup: chat.isGroup,
-      isReadOnly: chat.isReadOnly || false,
-      unreadCount: chat.unreadCount || 0,
-      lastMessageTimestamp: chat.timestamp || null,
-      pinned: chat.pinned || false,
-    }));
-    // Sort by most recent message first
-    simplified.sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
-    res.json({ chats: simplified });
+    const chats = await getClient().getChats();
+    const simplified = chats.map((c) => ({
+      id: c.id._serialized,
+      name: c.name || c.id.user,
+      isGroup: c.isGroup,
+      lastMessageTimestamp: c.timestamp || null,
+    })).sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
+    res.json({ chats: simplified, selected: getSelectedChats() });
   } catch (err) {
-    logger.error(`Failed to fetch chats: ${err.message}`);
-    res.status(500).json({ error: 'Failed to fetch chats', detail: err.message });
+    logger.error(`getChats failed: ${err.message}`);
+    res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/chats/filter — update which chats are monitored
+// Body: { ids: string[] }  — empty array = monitor all
+router.post('/chats/filter', (req, res) => {
+  const { ids } = req.body;
+  setSelectedChats(ids);
+  logger.info(`Chat filter updated: ${ids?.length ? ids.length + ' chats' : 'all chats'}`);
+  res.json({ ok: true, selected: getSelectedChats() });
 });
 
 module.exports = router;

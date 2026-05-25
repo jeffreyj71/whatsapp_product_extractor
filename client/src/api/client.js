@@ -14,29 +14,19 @@ async function apiFetch(path, options = {}) {
 
 export const api = {
   getStatus: () => apiFetch('/status'),
-  getChats: () => apiFetch('/chats'),
-  startExtraction: (payload) =>
-    apiFetch('/extract', { method: 'POST', body: JSON.stringify(payload) }),
-  getJobStatus: (jobId) => apiFetch(`/extract/${jobId}/status`),
+  getChats:  () => apiFetch('/chats'),
+  setFilter: (ids) => apiFetch('/chats/filter', { method: 'POST', body: JSON.stringify({ ids }) }),
 };
 
-/**
- * Open a WebSocket connection to the backend and call handlers on events.
- * Returns a close() function.
- */
 export function connectWebSocket(handlers) {
-  const wsUrl = `ws://${window.location.hostname}:3001`;
-  const ws = new WebSocket(wsUrl);
-
+  const ws = new WebSocket(`ws://${window.location.hostname}:3001`);
   ws.onmessage = (event) => {
     try {
       const { event: name, data } = JSON.parse(event.data);
       handlers[name]?.(data);
     } catch {}
   };
-
   ws.onclose = () => handlers.close?.();
   ws.onerror = () => handlers.error?.();
-
   return { close: () => ws.close() };
 }

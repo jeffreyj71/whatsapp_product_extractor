@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const THRESHOLD = parseInt(process.env.NLP_THRESHOLD || '30', 10);
+let threshold = parseInt(process.env.NLP_THRESHOLD || '30', 10);
 
 // Keyword lists with weights
 const PRICE_PATTERNS = [
@@ -64,7 +64,10 @@ function scoreMessage(text) {
 }
 
 function isProductRelated(text) {
-  return scoreMessage(text) >= THRESHOLD;
+  return scoreMessage(text) >= threshold;
 }
 
-module.exports = { scoreMessage, isProductRelated };
+function getThreshold() { return threshold; }
+function setThreshold(val) { threshold = Math.max(0, Math.min(100, parseInt(val, 10))); }
+
+module.exports = { scoreMessage, isProductRelated, getThreshold, setThreshold };

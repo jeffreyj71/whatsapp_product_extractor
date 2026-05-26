@@ -1,7 +1,9 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import ImageViewer from './ImageViewer.jsx';
 
 export default function LiveFeed({ rows }) {
   const bottomRef = useRef(null);
+  const [viewerUrls, setViewerUrls] = useState(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -18,6 +20,8 @@ export default function LiveFeed({ rows }) {
 
   return (
     <div style={s.wrap}>
+      {viewerUrls && <ImageViewer urls={viewerUrls} onClose={() => setViewerUrls(null)} />}
+
       <div style={s.tableWrap}>
         <table style={s.table}>
           <thead>
@@ -41,7 +45,15 @@ export default function LiveFeed({ rows }) {
                 <td style={s.td}>{row.date}</td>
                 <td style={s.td}>{row.time}</td>
                 <td style={{ ...s.td, maxWidth: 300 }}>{row.text || '—'}</td>
-                <td style={s.td}>{row.hasImage ? '🖼️' : '—'}</td>
+                <td style={s.td}>
+                  {row.hasImage && row.mediaUrls?.length > 0
+                    ? (
+                      <button style={s.imgBtn} onClick={() => setViewerUrls(row.mediaUrls)} title="View image(s)">
+                        🖼️{row.mediaUrls.length > 1 ? ` ×${row.mediaUrls.length}` : ''}
+                      </button>
+                    )
+                    : '—'}
+                </td>
                 <td style={s.td}>
                   {row.nlpScore != null
                     ? <NlpBadge score={row.nlpScore} />
@@ -70,6 +82,7 @@ const s = {
   tr:        { borderBottom: '1px solid #21262d' },
   td:        { padding: '8px 12px', verticalAlign: 'top', wordBreak: 'break-word' },
   badge:     { fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 600 },
+  imgBtn:    { background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, padding: 0 },
   empty:     { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, padding: 40 },
   emptyText: { fontSize: 16, color: '#8b949e', margin: 0 },
   emptyHint: { fontSize: 13, color: '#484f58', margin: 0, textAlign: 'center', maxWidth: 360 },

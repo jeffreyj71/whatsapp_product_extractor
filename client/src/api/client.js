@@ -13,9 +13,13 @@ async function apiFetch(path, options = {}) {
 }
 
 export const api = {
-  getStatus: () => apiFetch('/status'),
-  getChats:  () => apiFetch('/chats'),
-  setFilter: (ids) => apiFetch('/chats/filter', { method: 'POST', body: JSON.stringify({ ids }) }),
+  getStatus:    () => apiFetch('/status'),
+  getChats:     () => apiFetch('/chats'),
+  setFilter:    (ids) => apiFetch('/chats/filter', { method: 'POST', body: JSON.stringify({ ids }) }),
+  reset:        (mode) => apiFetch('/reset', { method: 'POST', body: JSON.stringify({ mode }) }),
+  logout:       () => apiFetch('/logout', { method: 'POST' }),
+  getSettings:  () => apiFetch('/settings'),
+  saveSettings: (data) => apiFetch('/settings', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 export function connectWebSocket(handlers) {

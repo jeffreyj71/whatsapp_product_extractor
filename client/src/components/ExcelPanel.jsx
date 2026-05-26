@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function ExcelPanel({ filePath, stats }) {
+export default function ExcelPanel({ filePath, stats, onReset }) {
   const sheet1 = stats?.sheet1Rows ?? 0;
   const sheet2 = stats?.sheet2Rows ?? 0;
 
@@ -18,6 +18,7 @@ export default function ExcelPanel({ filePath, stats }) {
         <span style={s.fileLabel}>Excel file:</span>
         <code style={s.filePath}>{filePath || 'Initialising…'}</code>
       </div>
+      <button style={s.resetBtn} onClick={onReset}>Reset</button>
     </div>
   );
 }
@@ -30,4 +31,5 @@ const s = {
   fileBox:   { display: 'flex', alignItems: 'center', gap: 8, flex: 1 },
   fileLabel: { fontSize: 12, color: '#8b949e', whiteSpace: 'nowrap' },
   filePath:  { fontSize: 12, color: '#79c0ff', background: '#0d1117', padding: '4px 10px', borderRadius: 4, wordBreak: 'break-all' },
+  resetBtn:  { marginLeft: 'auto', background: 'transparent', border: '1px solid #6e2020', color: '#f85149', borderRadius: 6, padding: '5px 14px', cursor: 'pointer', fontSize: 12, flexShrink: 0 },
 };

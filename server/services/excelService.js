@@ -41,13 +41,14 @@ async function init() {
   // Sheet 1 — text/product messages
   sheet1 = workbook.addWorksheet('Products');
   sheet1.columns = [
-    { header: 'S.No',      key: 'sno',      width: 6 },
-    { header: 'Sent By',   key: 'sentBy',   width: 20 },
-    { header: 'Number',    key: 'number',   width: 18 },
-    { header: 'Date',      key: 'date',     width: 14 },
-    { header: 'Time',      key: 'time',     width: 10 },
-    { header: 'Text',      key: 'text',     width: 60 },
-    { header: 'Has Image', key: 'hasImage', width: 12 },
+    { header: 'S.No',       key: 'sno',       width: 6 },
+    { header: 'Sent By',    key: 'sentBy',    width: 20 },
+    { header: 'Number',     key: 'number',    width: 18 },
+    { header: 'Date',       key: 'date',      width: 14 },
+    { header: 'Time',       key: 'time',      width: 10 },
+    { header: 'Text',       key: 'text',      width: 60 },
+    { header: 'Has Image',  key: 'hasImage',  width: 12 },
+    { header: 'Is Product', key: 'isProduct', width: 12 },
   ];
   styleHeader(sheet1);
 
@@ -83,13 +84,14 @@ async function appendTextRow(data) {
   if (!sheet1) await init();
 
   const row = sheet1.addRow({
-    sno:      sno1++,
-    sentBy:   data.sentBy || '',
-    number:   data.number || '',
-    date:     data.date || '',
-    time:     data.time || '',
-    text:     data.text || '',
-    hasImage: data.mediaPath ? 'Yes' : 'No',
+    sno:       sno1++,
+    sentBy:    data.sentBy || '',
+    number:    data.number || '',
+    date:      data.date || '',
+    time:      data.time || '',
+    text:      data.text || '',
+    hasImage:  data.mediaPath ? 'Yes' : 'No',
+    isProduct: data.isProduct ? 'Yes' : 'No',
   });
   row.alignment = { wrapText: true, vertical: 'middle' };
 
@@ -168,4 +170,15 @@ function getStats() {
   return { sheet1Rows: sno1 - 1, sheet2Rows: sno2 - 1 };
 }
 
-module.exports = { init, appendTextRow, appendImageRow, getFilePath, getStats };
+async function reset() {
+  // Delete the current file if it exists
+  if (filePath && fs.existsSync(filePath)) {
+    try { fs.unlinkSync(filePath); } catch (err) { logger.warn(`Could not delete Excel: ${err.message}`); }
+  }
+  // Reset state
+  workbook = null; sheet1 = null; sheet2 = null; filePath = null; sno1 = 1; sno2 = 1;
+  // Create a fresh file
+  await init();
+}
+
+module.exports = { init, appendTextRow, appendImageRow, getFilePath, getStats, reset };

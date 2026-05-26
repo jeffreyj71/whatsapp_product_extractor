@@ -8,6 +8,7 @@ let client = null;
 let currentQR = null;
 let connectionStatus = 'disconnected';
 let connectedInfo = null;
+let storedOnMessage = null;
 const wsClients = new Set();
 
 function broadcast(event, data) {
@@ -36,6 +37,7 @@ function getClient() {
 
 async function initClient(onMessage) {
   if (client) return;
+  storedOnMessage = onMessage;
 
   const sessionPath = path.resolve(process.env.SESSION_DATA_PATH || '.wwebjs_auth');
 
@@ -43,6 +45,7 @@ async function initClient(onMessage) {
     authStrategy: new LocalAuth({ dataPath: sessionPath }),
     puppeteer: {
       headless: true,
+      protocolTimeout: 120000,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -111,10 +114,33 @@ async function initClient(onMessage) {
     logger.warn(`WhatsApp disconnected: ${reason}`);
     broadcast('status', getStatus());
     client = null;
+    // Auto-restart so QR appears without needing a server restart
+    setTimeout(() => initClient(storedOnMessage), 4000);
   });
 
   logger.info('Initializing WhatsApp client…');
   await client.initialize();
 }
 
-module.exports = { initClient, getClient, getStatus, registerWsClient, broadcast };
+async function logoutClient() {
+  if (!client) return;
+
+  // Capture and null out immediately so nothing else touches the dead client
+  const dying = client;
+  client = null;
+  connectionStatus = 'disconnected';
+  connectedInfo = null;
+  currentQR = null;
+  broadcast('status', { status: 'disconnected', info: null });
+
+  try {
+    await dying.logout();
+  } catch {
+    try { await dying.destroy(); } catch {}
+  }
+
+  // Re-init to show QR screen again
+  setTimeout(() => initClient(storedOnMessage), 4000);
+}
+
+module.exports = { initClient, logoutClient, getClient, getStatus, registerWsClient, broadcast };

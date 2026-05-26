@@ -31,11 +31,15 @@ async function handleMessage(message) {
   try {
     const chatId = message.from;
 
+    // Skip outgoing messages sent from this device
+    if (message.fromMe) return;
+
+    // Skip system/broadcast and WhatsApp internal senders
+    if (chatId === 'status@broadcast') return;
+    if (message.author === '0@c.us' || chatId === '0@c.us') return;
+
     // Filter by selected chats
     if (selectedChatIds && !selectedChatIds.has(chatId)) return;
-
-    // Only process group messages and individual chats (skip system/broadcast)
-    if (chatId === 'status@broadcast') return;
 
     const contact = await message.getContact();
     const senderId = contact.id?.user || message.author || chatId;
@@ -111,6 +115,7 @@ async function onFlush(chatId, senderId, items) {
         ...rowBase,
         text:      combinedText,
         mediaPath: mediaPaths[0] || null,
+        isProduct,
       });
 
       broadcast('row', {
@@ -120,6 +125,7 @@ async function onFlush(chatId, senderId, items) {
         date, time,
         text:       combinedText,
         hasImage:   hasMedia,
+        mediaUrls:  mediaPaths.map((p) => `/media/${path.basename(p)}`),
         nlpScore,
         isProduct,
         stats:      getStats(),
@@ -141,6 +147,7 @@ async function onFlush(chatId, senderId, items) {
           senderId:   first.senderId,
           date, time,
           hasImage:   true,
+          mediaUrls:  [`/media/${path.basename(mediaPaths[i])}`],
           isProduct:  false,
           stats:      getStats(),
           filePath:   getFilePath(),

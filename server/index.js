@@ -8,8 +8,11 @@ const logger = require('./utils/logger');
 const { initClient, registerWsClient } = require('./whatsappClient');
 const { handleMessage, init: initExcel } = require('./services/listenerService');
 
-const statusRouter = require('./routes/status');
-const chatsRouter = require('./routes/chats');
+const statusRouter   = require('./routes/status');
+const chatsRouter    = require('./routes/chats');
+const resetRouter    = require('./routes/reset');
+const logoutRouter   = require('./routes/logout');
+const settingsRouter = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,7 +21,14 @@ app.use(cors());
 app.use(express.json());
 app.use('/api', statusRouter);
 app.use('/api', chatsRouter);
+app.use('/api', resetRouter);
+app.use('/api', logoutRouter);
+app.use('/api', settingsRouter);
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// Serve downloaded media files so the browser can display them
+const MEDIA_TMP = require('path').resolve('output', 'tmp_media');
+app.use('/media', express.static(MEDIA_TMP));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -38,6 +48,16 @@ server.listen(PORT, async () => {
   initClient(handleMessage).catch((err) =>
     logger.error(`WhatsApp init error: ${err.message}`)
   );
+});
+
+// Catch EBUSY errors from WhatsApp session cleanup on Windows — safe to ignore
+process.on('uncaughtException', (err) => {
+  if (err.message?.includes('EBUSY') || err.message?.includes('detached Frame')) {
+    logger.warn(`WhatsApp cleanup error (safe to ignore): ${err.message}`);
+    return;
+  }
+  logger.error(`Uncaught exception: ${err.message}`);
+  process.exit(1);
 });
 
 // Graceful shutdown

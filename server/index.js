@@ -13,6 +13,8 @@ const chatsRouter    = require('./routes/chats');
 const resetRouter    = require('./routes/reset');
 const logoutRouter   = require('./routes/logout');
 const settingsRouter = require('./routes/settings');
+const pendingRouter  = require('./routes/pending');
+const featuresRouter = require('./routes/features');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,8 +24,10 @@ app.use(express.json());
 app.use('/api', statusRouter);
 app.use('/api', chatsRouter);
 app.use('/api', resetRouter);
+app.use('/api', featuresRouter);
 app.use('/api', logoutRouter);
 app.use('/api', settingsRouter);
+app.use('/api', pendingRouter);
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // Serve downloaded media files so the browser can display them
@@ -63,6 +67,7 @@ process.on('uncaughtException', (err) => {
 // Graceful shutdown
 process.on('SIGINT', () => {
   const { shutdown } = require('./services/listenerService');
+  const { shutdown: shutdownOcr } = require('./services/ocrService');
   shutdown();
-  process.exit(0);
+  shutdownOcr().finally(() => process.exit(0));
 });

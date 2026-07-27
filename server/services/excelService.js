@@ -9,12 +9,15 @@ const OUTPUT_BASE = path.resolve(process.env.OUTPUT_PATH || 'output');
 let workbook = null;
 let sheet1 = null; // Text / product messages
 let sheet2 = null; // Image-only messages
+let sheet3 = null; // Bills
 let filePath = null;
 let sno1 = 1;
 let sno2 = 1;
+let sno3 = 1;
 
 const SHEET1_HEADERS = ['S.No', 'Sent By', 'Number', 'Date', 'Time', 'Text', 'Has Image'];
 const SHEET2_HEADERS = ['S.No', 'Sent By', 'Number', 'Date', 'Time', 'Image'];
+const SHEET3_HEADERS = ['S.No', 'Sent By', 'Number', 'Date', 'Time', 'Extracted Fields'];
 
 const ROW_HEIGHT = 80; // px height for image rows
 const IMG_WIDTH  = 100;
@@ -41,14 +44,15 @@ async function init() {
   // Sheet 1 — text/product messages
   sheet1 = workbook.addWorksheet('Products');
   sheet1.columns = [
-    { header: 'S.No',       key: 'sno',       width: 6 },
-    { header: 'Sent By',    key: 'sentBy',    width: 20 },
-    { header: 'Number',     key: 'number',    width: 18 },
-    { header: 'Date',       key: 'date',      width: 14 },
-    { header: 'Time',       key: 'time',      width: 10 },
-    { header: 'Text',       key: 'text',      width: 60 },
-    { header: 'Has Image',  key: 'hasImage',  width: 12 },
-    { header: 'Is Product', key: 'isProduct', width: 12 },
+    { header: 'S.No',        key: 'sno',        width: 6 },
+    { header: 'Sent By',     key: 'sentBy',     width: 20 },
+    { header: 'Number',      key: 'number',     width: 18 },
+    { header: 'Date',        key: 'date',       width: 14 },
+    { header: 'Time',        key: 'time',       width: 10 },
+    { header: 'Text',        key: 'text',       width: 60 },
+    { header: 'Text Source', key: 'textSource', width: 14 },
+    { header: 'Has Image',   key: 'hasImage',   width: 12 },
+    { header: 'Is Product',  key: 'isProduct',  width: 12 },
   ];
   styleHeader(sheet1);
 
@@ -63,6 +67,18 @@ async function init() {
     { header: 'Image',   key: 'image',  width: 18 },
   ];
   styleHeader(sheet2);
+
+  // Sheet 3 — bills
+  sheet3 = workbook.addWorksheet('Bills');
+  sheet3.columns = [
+    { header: 'S.No',   key: 'sno',    width: 6 },
+    { header: 'Sent By', key: 'sentBy', width: 20 },
+    { header: 'Number', key: 'number', width: 18 },
+    { header: 'Date',   key: 'date',   width: 14 },
+    { header: 'Time',   key: 'time',   width: 10 },
+    { header: 'Extracted Fields', key: 'fields', width: 70 },
+  ];
+  styleHeader(sheet3);
 
   await save();
   logger.info(`Excel file initialised: ${filePath}`);
@@ -84,14 +100,15 @@ async function appendTextRow(data) {
   if (!sheet1) await init();
 
   const row = sheet1.addRow({
-    sno:       sno1++,
-    sentBy:    data.sentBy || '',
-    number:    data.number || '',
-    date:      data.date || '',
-    time:      data.time || '',
-    text:      data.text || '',
-    hasImage:  data.mediaPath ? 'Yes' : 'No',
-    isProduct: data.isProduct ? 'Yes' : 'No',
+    sno:        sno1++,
+    sentBy:     data.sentBy || '',
+    number:     data.number || '',
+    date:       data.date || '',
+    time:       data.time || '',
+    text:       data.text || '',
+    textSource: data.textSource || 'typed',
+    hasImage:   data.mediaPath ? 'Yes' : 'No',
+    isProduct:  data.isProduct ? 'Yes' : 'No',
   });
   row.alignment = { wrapText: true, vertical: 'middle' };
 
@@ -145,6 +162,26 @@ async function appendImageRow(data) {
   await save();
 }
 
+/**
+ * Append a row to Sheet 3 (structured bill/receipt extraction result).
+ * @param {{ sentBy, number, date, time, fields }} data
+ */
+async function appendBillRow(data) {
+  if (!sheet3) await init();
+
+  const row = sheet3.addRow({
+    sno:    sno3++,
+    sentBy: data.sentBy || '',
+    number: data.number || '',
+    date:   data.date || '',
+    time:   data.time || '',
+    fields: JSON.stringify(data.fields || {}, null, 0),
+  });
+  row.alignment = { wrapText: true, vertical: 'middle' };
+
+  await save();
+}
+
 function getImageExtension(mimetype) {
   const map = {
     'image/jpeg': 'jpeg',
@@ -167,7 +204,7 @@ async function save() {
 
 function getFilePath() { return filePath; }
 function getStats() {
-  return { sheet1Rows: sno1 - 1, sheet2Rows: sno2 - 1 };
+  return { sheet1Rows: sno1 - 1, sheet2Rows: sno2 - 1, sheet3Rows: sno3 - 1 };
 }
 
 async function reset() {
@@ -176,9 +213,10 @@ async function reset() {
     try { fs.unlinkSync(filePath); } catch (err) { logger.warn(`Could not delete Excel: ${err.message}`); }
   }
   // Reset state
-  workbook = null; sheet1 = null; sheet2 = null; filePath = null; sno1 = 1; sno2 = 1;
+  workbook = null; sheet1 = null; sheet2 = null; sheet3 = null; filePath = null;
+  sno1 = 1; sno2 = 1; sno3 = 1;
   // Create a fresh file
   await init();
 }
 
-module.exports = { init, appendTextRow, appendImageRow, getFilePath, getStats, reset };
+module.exports = { init, appendTextRow, appendImageRow, appendBillRow, getFilePath, getStats, reset };

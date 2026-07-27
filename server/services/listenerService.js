@@ -2,7 +2,11 @@ const path = require('path');
 const fs = require('fs');
 const { add: addToBuffer, flushAll } = require('./bufferService');
 const { isProductRelated, scoreMessage } = require('./nlpService');
-const { appendTextRow, appendImageRow, getFilePath, getStats, init } = require('./excelService');
+const { extractText } = require('./ocrService');
+const { extractBill } = require('./billExtractorService');
+const { getFlags } = require('./featureFlags');
+const { markIncoming } = require('./replyTracker');
+const { appendTextRow, appendImageRow, appendBillRow, getFilePath, getStats, init } = require('./excelService');
 const { broadcast } = require('../whatsappClient');
 const logger = require('../utils/logger');
 require('dotenv').config();
@@ -45,9 +49,14 @@ async function handleMessage(message) {
     const senderId = contact.id?.user || message.author || chatId;
     const senderName = contact.pushname || contact.name || senderId;
 
+    // Flag this chat as "awaiting reply" immediately — don't wait for the buffer window
+    markIncoming(chatId, senderName);
+    broadcast('reply-status', { chatId, senderName, awaitingReply: true, lastIncomingAt: Date.now() });
+
     // Download media immediately if present (before buffer window closes)
     let mediaPath = null;
     let mimetype = null;
+    let ocrText = null;
     if (message.hasMedia) {
       ensureMediaDir();
       try {
@@ -58,6 +67,39 @@ async function handleMessage(message) {
           const filename = `${message.id.id}.${ext}`;
           mediaPath = path.join(MEDIA_TMP, filename);
           fs.writeFileSync(mediaPath, Buffer.from(media.data, 'base64'));
+
+          // Run OCR on images only — skip video/audio/docs
+          if (mimetype && mimetype.startsWith('image/')) {
+            ocrText = await extractText(mediaPath);
+            if (ocrText) {
+              logger.info(`[OCR] Extracted ${ocrText.length} chars from image`);
+            }
+
+            // Bill Extractor — only runs when the sidebar toggle is on. Independent
+            // of the normal Products/Images pipeline: a bill photo still goes through
+            // that as usual, and ALSO gets a row here if extraction succeeds.
+            if (getFlags().billExtractorEnabled) {
+              const billFields = await extractBill(mediaPath);
+              if (billFields) {
+                const now = new Date();
+                await appendBillRow({
+                  sentBy: senderName,
+                  number: senderId,
+                  date:   now.toLocaleDateString('en-GB'),
+                  time:   now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+                  fields: billFields,
+                });
+                broadcast('bill-row', {
+                  senderName, senderId,
+                  fields: billFields,
+                  timestamp: Date.now(),
+                  stats: getStats(),
+                  filePath: getFilePath(),
+                });
+                logger.info(`[BillExtractor] Extracted bill fields from ${senderName}`);
+              }
+            }
+          }
         }
       } catch (err) {
         logger.warn(`Media download failed: ${err.message}`);
@@ -66,6 +108,7 @@ async function handleMessage(message) {
 
     const item = {
       text:      message.body || '',
+      ocrText,
       mediaPath,
       mimetype,
       timestamp: message.timestamp,
@@ -84,8 +127,17 @@ async function handleMessage(message) {
  */
 async function onFlush(chatId, senderId, items) {
   try {
-    // Merge all text from the group
-    const combinedText = items.map((i) => i.text).filter(Boolean).join('\n').trim();
+    // Merge all typed text from the group
+    const typedText = items.map((i) => i.text).filter(Boolean).join('\n').trim();
+    // Merge all OCR-extracted text from any images in the group
+    const ocrTexts = items.map((i) => i.ocrText).filter(Boolean);
+    const ocrText = ocrTexts.join('\n').trim();
+    // Combined text is what actually gets NLP-scored — a photo of a price list
+    // should be flagged as product-related exactly like a typed message would be
+    const combinedText = [typedText, ocrText].filter(Boolean).join('\n').trim();
+
+    const textSource = typedText && ocrText ? 'typed+ocr' : (ocrText ? 'ocr' : (typedText ? 'typed' : null));
+
     // Collect all media paths
     const mediaPaths = items.map((i) => i.mediaPath).filter(Boolean);
     const mimetypes  = items.map((i) => i.mimetype).filter(Boolean);
@@ -113,8 +165,9 @@ async function onFlush(chatId, senderId, items) {
 
       await appendTextRow({
         ...rowBase,
-        text:      combinedText,
-        mediaPath: mediaPaths[0] || null,
+        text:       combinedText,
+        textSource,
+        mediaPath:  mediaPaths[0] || null,
         isProduct,
       });
 
@@ -124,6 +177,7 @@ async function onFlush(chatId, senderId, items) {
         senderId:   first.senderId,
         date, time,
         text:       combinedText,
+        textSource,
         hasImage:   hasMedia,
         mediaUrls:  mediaPaths.map((p) => `/media/${path.basename(p)}`),
         nlpScore,

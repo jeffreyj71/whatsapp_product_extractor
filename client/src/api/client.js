@@ -20,6 +20,9 @@ export const api = {
   logout:       () => apiFetch('/logout', { method: 'POST' }),
   getSettings:  () => apiFetch('/settings'),
   saveSettings: (data) => apiFetch('/settings', { method: 'POST', body: JSON.stringify(data) }),
+  getPending:   () => apiFetch('/pending'),
+  getFeatures:  () => apiFetch('/features'),
+  setFeature:   (name, enabled) => apiFetch('/features', { method: 'POST', body: JSON.stringify({ name, enabled }) }),
 };
 
 export function connectWebSocket(handlers) {

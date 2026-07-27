@@ -2,6 +2,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const path = require('path');
 const logger = require('./utils/logger');
+const { markReplied } = require('./services/replyTracker');
 require('dotenv').config();
 
 let client = null;
@@ -105,6 +106,15 @@ async function initClient(onMessage) {
   // Live message listener — fires for every incoming message
   client.on('message', async (message) => {
     if (onMessage) onMessage(message);
+  });
+
+  // Fires for EVERY message, including ones sent from this account (unlike 'message',
+  // which is incoming-only). Used purely to detect "you replied to this chat".
+  client.on('message_create', (message) => {
+    if (message.fromMe) {
+      markReplied(message.to);
+      broadcast('reply-status', { chatId: message.to, awaitingReply: false });
+    }
   });
 
   client.on('disconnected', (reason) => {

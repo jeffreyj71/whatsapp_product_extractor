@@ -16,6 +16,7 @@ router.get('/chats', async (_req, res) => {
       id: c.id._serialized,
       name: c.name || c.id.user,
       isGroup: c.isGroup,
+      unreadCount: c.unreadCount || 0,
       lastMessageTimestamp: c.timestamp || null,
     })).sort((a, b) => (b.lastMessageTimestamp || 0) - (a.lastMessageTimestamp || 0));
     res.json({ chats: simplified, selected: getSelectedChats() });

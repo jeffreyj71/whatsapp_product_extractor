@@ -81,7 +81,7 @@ const s = {
   th:        { padding: '10px 12px', background: '#161b22', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #30363d', whiteSpace: 'nowrap', position: 'sticky', top: 0 },
   tr:        { borderBottom: '1px solid #21262d' },
   td:        { padding: '8px 12px', verticalAlign: 'top', wordBreak: 'break-word' },
-  badge:     { fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 600 },
+  badge:     { fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-block' },
   imgBtn:    { background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16, padding: 0 },
   empty:     { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, padding: 40 },
   emptyText: { fontSize: 16, color: '#8b949e', margin: 0 },

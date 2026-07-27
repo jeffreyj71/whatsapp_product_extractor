@@ -6,12 +6,12 @@ export default function ChatFilter({ onFilterChange }) {
   const [selected, setSelected] = useState(new Set());
   const [allSelected, setAllSelected] = useState(true);
   const [search, setSearch] = useState('');
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.getChats().then(({ chats }) => {
       setChats(chats);
-      // Default: all selected
       setSelected(new Set(chats.map((c) => c.id)));
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -19,8 +19,12 @@ export default function ChatFilter({ onFilterChange }) {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return q ? chats.filter((c) => c.name.toLowerCase().includes(q)) : chats;
-  }, [chats, search]);
+    let result = q ? chats.filter((c) => c.name.toLowerCase().includes(q)) : chats;
+    if (unreadOnly) result = result.filter((c) => c.unreadCount > 0);
+    return result;
+  }, [chats, search, unreadOnly]);
+
+  const unreadTotal = useMemo(() => chats.filter((c) => c.unreadCount > 0).length, [chats]);
 
   const toggle = (id) => {
     const next = new Set(selected);
@@ -45,7 +49,6 @@ export default function ChatFilter({ onFilterChange }) {
 
   const pushFilter = (ids) => {
     const arr = [...ids];
-    // Empty array = monitor all (pass null-like signal); full = all; partial = filtered
     api.setFilter(arr.length === chats.length ? [] : arr);
     onFilterChange?.(arr);
   };
@@ -67,6 +70,15 @@ export default function ChatFilter({ onFilterChange }) {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
+      <label style={s.unreadFilter}>
+        <input
+          type="checkbox"
+          checked={unreadOnly}
+          onChange={(e) => setUnreadOnly(e.target.checked)}
+          style={{ accentColor: '#25d366' }}
+        />
+        <span>Unread chats only {unreadTotal > 0 ? `(${unreadTotal})` : ''}</span>
+      </label>
       <div style={s.list}>
         {filtered.map((chat) => (
           <label key={chat.id} style={s.item}>
@@ -78,6 +90,7 @@ export default function ChatFilter({ onFilterChange }) {
             />
             <span style={s.icon}>{chat.isGroup ? '👥' : '👤'}</span>
             <span style={s.name}>{chat.name}</span>
+            {chat.unreadCount > 0 && <span style={s.unreadBadge}>{chat.unreadCount}</span>}
           </label>
         ))}
       </div>
@@ -93,10 +106,12 @@ const s = {
   actions:   { display: 'flex', gap: 6 },
   actionBtn: { background: '#21262d', border: '1px solid #30363d', color: '#8b949e', borderRadius: 4, padding: '2px 10px', cursor: 'pointer', fontSize: 12 },
   search:    { padding: '6px 10px', background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, color: '#e6edf3', fontSize: 13, outline: 'none' },
+  unreadFilter: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8b949e', padding: '2px 2px' },
+  unreadBadge: { background: '#25d366', color: '#0d1117', fontSize: 10.5, fontWeight: 700, borderRadius: 9, padding: '1px 6px', flexShrink: 0 },
   list:      { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, border: '1px solid #30363d', borderRadius: 6, padding: 6 },
   item:      { display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 4, cursor: 'pointer', fontSize: 13 },
   icon:      { fontSize: 14 },
-  name:      { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  name:      { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   count:     { fontSize: 11, color: '#8b949e', margin: 0, textAlign: 'right' },
   loading:   { color: '#8b949e', fontSize: 13, padding: 8 },
 };

@@ -44,16 +44,17 @@ async function initClient(onMessage) {
 
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: sessionPath }),
-    puppeteer: {
-      headless: true,
-      protocolTimeout: 120000,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    },
+puppeteer: {
+  headless: true,
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+  protocolTimeout: 120000,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+  ],
+},
   });
 
   client.on('qr', async (qrString) => {

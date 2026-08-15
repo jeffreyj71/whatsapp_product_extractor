@@ -9,6 +9,7 @@ import SettingsPanel from './components/SettingsPanel.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import MissedChatReport from './components/MissedChatReport.jsx';
 import FeaturePlaceholder from './components/FeaturePlaceholder.jsx';
+import EventReminders from './components/EventReminders.jsx';
 
 export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
@@ -16,14 +17,16 @@ export default function App() {
   const [qrData, setQrData]                     = useState(null);
   const [rows, setRows]                         = useState([]);
   const [filePath, setFilePath]                 = useState(null);
-  const [stats, setStats]                       = useState({ sheet1Rows: 0, sheet2Rows: 0, sheet3Rows: 0 });
+  const [stats, setStats]                       = useState({ sheet1Rows: 0, sheet2Rows: 0, sheet3Rows: 0, sheet4Rows: 0 });
   const [showReset, setShowReset]               = useState(false);
   const [showSettings, setShowSettings]         = useState(false);
   const [activeView, setActiveView]             = useState('extractor');
   const [billEnabled, setBillEnabled]           = useState(false);
+  const [eventEnabled, setEventEnabled]         = useState(false);
   const [oppEnabled, setOppEnabled]             = useState(false);
   const [pendingChats, setPendingChats]         = useState({});
   const [billRows, setBillRows]                 = useState([]);
+  const [eventRows, setEventRows]               = useState([]);
   const [productEnabled, setProductEnabled] = useState(true);
 
   const pendingCount = Object.values(pendingChats).filter((c) => c.awaitingReply).length;
@@ -60,6 +63,16 @@ export default function App() {
     }
   }
 
+  async function toggleEventEnabled(next) {
+    setEventEnabled(next);
+    try {
+      await api.setFeature('eventRemindersEnabled', next);
+    } catch (err) {
+      console.error('Failed to update Event Reminders toggle:', err.message);
+      setEventEnabled(!next);
+    }
+  }
+
   async function toggleOppEnabled(next) {
     setOppEnabled(next);
     try {
@@ -91,6 +104,7 @@ export default function App() {
       reset: (data) => {
         setRows([]);
         setBillRows([]);
+        setEventRows([]);
         if (data.filePath) setFilePath(data.filePath);
         if (data.stats)    setStats(data.stats);
       },
@@ -111,6 +125,9 @@ export default function App() {
         if (data.filePath) setFilePath(data.filePath);
         if (data.stats)    setStats(data.stats);
       },
+      'event-detected': (data) => {
+        setEventRows((prev) => [...prev, data]);
+      },
     });
 
     api.getPending().then(({ pending }) => {
@@ -123,6 +140,7 @@ export default function App() {
     // sidebar would always show "off" on page refresh even if it was left on.
     api.getFeatures().then((flags) => {
       setBillEnabled(!!flags.billExtractorEnabled);
+      setEventEnabled(!!flags.eventRemindersEnabled);
       setOppEnabled(!!flags.businessOpportunitiesEnabled);
     }).catch(() => {});
 
@@ -159,6 +177,8 @@ export default function App() {
             pendingCount={pendingCount}
             billEnabled={billEnabled}
             setBillEnabled={toggleBillEnabled}
+            eventEnabled={eventEnabled}
+            setEventEnabled={toggleEventEnabled}
             oppEnabled={oppEnabled}
             setOppEnabled={toggleOppEnabled}
           />
@@ -189,6 +209,7 @@ export default function App() {
                 }
               />
             )}
+            {activeView === 'events' && <EventReminders events={eventRows} />}
             {activeView === 'opportunities' && (
               <FeaturePlaceholder
                 icon="💡"

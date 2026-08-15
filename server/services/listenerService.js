@@ -4,9 +4,11 @@ const { add: addToBuffer, flushAll } = require('./bufferService');
 const { isProductRelated, scoreMessage } = require('./nlpService');
 const { extractText } = require('./ocrService');
 const { extractBill } = require('./billExtractorService');
+const { detectEvent } = require('./eventService');
+const { addEvent } = require('./eventStore');
 const { getFlags } = require('./featureFlags');
 const { markIncoming } = require('./replyTracker');
-const { appendTextRow, appendImageRow, appendBillRow, getFilePath, getStats, init } = require('./excelService');
+const { appendTextRow, appendImageRow, appendBillRow, appendEventRow, getFilePath, getStats, init } = require('./excelService');
 const { broadcast } = require('../whatsappClient');
 const logger = require('../utils/logger');
 require('dotenv').config();
@@ -103,6 +105,37 @@ async function handleMessage(message) {
         }
       } catch (err) {
         logger.warn(`Media download failed: ${err.message}`);
+      }
+    }
+
+    // Event Reminders runs after OCR/bill handling, using the typed message and
+    // any OCR result together. This lets a caption provide an event title for a
+    // date found in an image (and vice versa).
+    const eventText = [message.body || '', ocrText].filter(Boolean).join('\n').trim();
+    if (eventText && getFlags().eventRemindersEnabled) {
+      const detected = detectEvent(eventText);
+      if (detected) {
+        const event = addEvent({
+          ...detected,
+          sender: senderName,
+          senderId,
+        });
+        await appendEventRow({
+          sentBy: senderName,
+          number: senderId,
+          title: event.title,
+          eventDate: event.date,
+          sourceMessage: event.rawText,
+        });
+        broadcast('event-detected', {
+          id: event.id,
+          title: event.title,
+          date: event.date,
+          sender: event.sender,
+          senderId: event.senderId,
+          icsUrl: `/api/events/${event.id}/ics`,
+        });
+        logger.info(`[EventReminders] Detected event from ${senderName}: ${event.title}`);
       }
     }
 
@@ -208,6 +241,7 @@ async function onFlush(chatId, senderId, items) {
         });
       }
     }
+
   } catch (err) {
     logger.error(`onFlush error: ${err.message}`);
   }

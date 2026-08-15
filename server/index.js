@@ -15,6 +15,7 @@ const logoutRouter   = require('./routes/logout');
 const settingsRouter = require('./routes/settings');
 const pendingRouter  = require('./routes/pending');
 const featuresRouter = require('./routes/features');
+const eventsRouter   = require('./routes/events');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,6 +26,7 @@ app.use('/api', statusRouter);
 app.use('/api', chatsRouter);
 app.use('/api', resetRouter);
 app.use('/api', featuresRouter);
+app.use('/api', eventsRouter);
 app.use('/api', logoutRouter);
 app.use('/api', settingsRouter);
 app.use('/api', pendingRouter);

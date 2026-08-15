@@ -1,6 +1,7 @@
 // Simple in-memory feature flags — resets on server restart, same as replyTracker.
 let flags = {
   billExtractorEnabled: false,
+  eventRemindersEnabled: false,
   businessOpportunitiesEnabled: false,
 };
 

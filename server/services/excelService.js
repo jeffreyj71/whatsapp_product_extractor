@@ -10,10 +10,12 @@ let workbook = null;
 let sheet1 = null; // Text / product messages
 let sheet2 = null; // Image-only messages
 let sheet3 = null; // Bills
+let sheet4 = null; // Events
 let filePath = null;
 let sno1 = 1;
 let sno2 = 1;
 let sno3 = 1;
+let sno4 = 1;
 
 const SHEET1_HEADERS = ['S.No', 'Sent By', 'Number', 'Date', 'Time', 'Text', 'Has Image'];
 const SHEET2_HEADERS = ['S.No', 'Sent By', 'Number', 'Date', 'Time', 'Image'];
@@ -79,6 +81,18 @@ async function init() {
     { header: 'Extracted Fields', key: 'fields', width: 70 },
   ];
   styleHeader(sheet3);
+
+  // Sheet 4 — detected event reminders
+  sheet4 = workbook.addWorksheet('Events');
+  sheet4.columns = [
+    { header: 'S.No',            key: 'sno',           width: 6 },
+    { header: 'Sent By',         key: 'sentBy',        width: 20 },
+    { header: 'Number',          key: 'number',        width: 18 },
+    { header: 'Detected Title',  key: 'title',          width: 35 },
+    { header: 'Event Date',      key: 'eventDate',      width: 24 },
+    { header: 'Source Message',  key: 'sourceMessage',  width: 70 },
+  ];
+  styleHeader(sheet4);
 
   await save();
   logger.info(`Excel file initialised: ${filePath}`);
@@ -182,6 +196,28 @@ async function appendBillRow(data) {
   await save();
 }
 
+/**
+ * Append a row to Sheet 4 (detected event reminder).
+ * @param {{ sentBy, number, title, eventDate, sourceMessage }} data
+ */
+async function appendEventRow(data) {
+  if (!sheet4) await init();
+
+  const row = sheet4.addRow({
+    sno:           sno4++,
+    sentBy:        data.sentBy || '',
+    number:        data.number || '',
+    title:         data.title || 'Event',
+    eventDate:     data.eventDate instanceof Date
+      ? data.eventDate.toLocaleString('en-GB')
+      : (data.eventDate || ''),
+    sourceMessage: data.sourceMessage || '',
+  });
+  row.alignment = { wrapText: true, vertical: 'middle' };
+
+  await save();
+}
+
 function getImageExtension(mimetype) {
   const map = {
     'image/jpeg': 'jpeg',
@@ -204,7 +240,7 @@ async function save() {
 
 function getFilePath() { return filePath; }
 function getStats() {
-  return { sheet1Rows: sno1 - 1, sheet2Rows: sno2 - 1, sheet3Rows: sno3 - 1 };
+  return { sheet1Rows: sno1 - 1, sheet2Rows: sno2 - 1, sheet3Rows: sno3 - 1, sheet4Rows: sno4 - 1 };
 }
 
 async function reset() {
@@ -213,10 +249,10 @@ async function reset() {
     try { fs.unlinkSync(filePath); } catch (err) { logger.warn(`Could not delete Excel: ${err.message}`); }
   }
   // Reset state
-  workbook = null; sheet1 = null; sheet2 = null; sheet3 = null; filePath = null;
-  sno1 = 1; sno2 = 1; sno3 = 1;
+  workbook = null; sheet1 = null; sheet2 = null; sheet3 = null; sheet4 = null; filePath = null;
+  sno1 = 1; sno2 = 1; sno3 = 1; sno4 = 1;
   // Create a fresh file
   await init();
 }
 
-module.exports = { init, appendTextRow, appendImageRow, appendBillRow, getFilePath, getStats, reset };
+module.exports = { init, appendTextRow, appendImageRow, appendBillRow, appendEventRow, getFilePath, getStats, reset };

@@ -11,7 +11,7 @@ function timeAgo(ts) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export default function MissedChatReport({ pendingChats }) {
+export default function MissedChatReport({ pendingChats, unseenSince = 0 }) {
   const [loading, setLoading] = useState(true);
   const [initial, setInitial] = useState([]);
 
@@ -48,7 +48,7 @@ export default function MissedChatReport({ pendingChats }) {
         <div style={s.list}>
           {sorted.map((c) => (
             <div key={c.chatId} style={s.row}>
-              <span style={s.dot} />
+              {c.lastIncomingAt > unseenSince && <span style={s.dot} aria-label="New missed chat" />}
               <span style={s.name}>{c.senderName || c.chatId}</span>
               <span style={s.time}>waiting {timeAgo(c.lastIncomingAt)}</span>
             </div>

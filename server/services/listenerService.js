@@ -6,6 +6,8 @@ const { extractText } = require('./ocrService');
 const { extractBill } = require('./billExtractorService');
 const { detectEvent } = require('./eventService');
 const { addEvent } = require('./eventStore');
+const { scoreMessage: scoreBusinessOpportunity } = require('./businessOpportunityService');
+const { addOpportunity } = require('./opportunityStore');
 const { getFlags } = require('./featureFlags');
 const { markIncoming } = require('./replyTracker');
 const { appendTextRow, appendImageRow, appendBillRow, appendEventRow, getFilePath, getStats, init } = require('./excelService');
@@ -133,9 +135,28 @@ async function handleMessage(message) {
           date: event.date,
           sender: event.sender,
           senderId: event.senderId,
+          reminderOffsets: event.reminderOffsets,
           icsUrl: `/api/events/${event.id}/ics`,
         });
         logger.info(`[EventReminders] Detected event from ${senderName}: ${event.title}`);
+      }
+    }
+
+    // Score each incoming message immediately, independently of the Product
+    // Extractor's buffer, so the opportunity view updates in real time.
+    const opportunityText = [message.body || '', ocrText].filter(Boolean).join('\n').trim();
+    if (opportunityText && getFlags().businessOpportunitiesEnabled) {
+      const result = scoreBusinessOpportunity(opportunityText);
+      if (result.score > 0) {
+        const opportunity = addOpportunity({
+          text: opportunityText,
+          sender: senderName,
+          senderId,
+          timestamp: Number(message.timestamp) * 1000 || Date.now(),
+          ...result,
+        });
+        broadcast('business-opportunity', opportunity);
+        logger.info(`[BusinessOpportunities] ${senderName}: score=${opportunity.score} tier=${opportunity.tier}`);
       }
     }
 

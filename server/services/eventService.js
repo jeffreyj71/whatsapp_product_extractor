@@ -7,11 +7,13 @@ const logger = require('../utils/logger');
  * This is intentionally fail-safe so event detection never interrupts the
  * normal WhatsApp message pipeline.
  */
-function detectEvent(text) {
+function detectEvent(text, referenceDate = new Date()) {
   try {
     if (typeof text !== 'string' || !text.trim()) return null;
 
-    const matches = chrono.parse(text);
+    // Resolve ambiguous relative references (for example, "Friday") forward
+    // from the time this message is processed, never to a prior occurrence.
+    const matches = chrono.parse(text, referenceDate, { forwardDate: true });
     const match = matches[0];
     if (!match) return null;
 
@@ -32,8 +34,8 @@ function detectEvent(text) {
   }
 }
 
-/** Generate a one-hour iCalendar event with a 30-minute display reminder. */
-function generateICS({ title, date, description } = {}) {
+/** Generate a one-hour iCalendar event with its selected display reminders. */
+function generateICS({ title, date, description, reminderOffsets = [30] } = {}) {
   try {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
 
@@ -42,11 +44,11 @@ function generateICS({ title, date, description } = {}) {
       description: description || '',
       start: [date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours(), date.getMinutes()],
       duration: { hours: 1 },
-      alarms: [{
+      alarms: reminderOffsets.map((minutes) => ({
         action: 'display',
         description: 'Event reminder',
-        trigger: { minutes: 30, before: true },
-      }],
+        trigger: { minutes, before: true },
+      })),
     });
 
     if (result.error || !result.value) {

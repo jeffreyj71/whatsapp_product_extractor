@@ -7,6 +7,7 @@ const { WebSocketServer } = require('ws');
 const logger = require('./utils/logger');
 const { initClient, registerWsClient } = require('./whatsappClient');
 const { handleMessage, init: initExcel } = require('./services/listenerService');
+const { start: startEventReminderScheduler, stop: stopEventReminderScheduler } = require('./services/eventReminderScheduler');
 
 const statusRouter   = require('./routes/status');
 const chatsRouter    = require('./routes/chats');
@@ -16,6 +17,7 @@ const settingsRouter = require('./routes/settings');
 const pendingRouter  = require('./routes/pending');
 const featuresRouter = require('./routes/features');
 const eventsRouter   = require('./routes/events');
+const opportunitiesRouter = require('./routes/opportunities');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,6 +29,7 @@ app.use('/api', chatsRouter);
 app.use('/api', resetRouter);
 app.use('/api', featuresRouter);
 app.use('/api', eventsRouter);
+app.use('/api', opportunitiesRouter);
 app.use('/api', logoutRouter);
 app.use('/api', settingsRouter);
 app.use('/api', pendingRouter);
@@ -49,6 +52,10 @@ server.listen(PORT, async () => {
 
   // Initialise Excel file before WhatsApp connects
   await initExcel();
+  startEventReminderScheduler((event) => {
+    const { broadcast } = require('./whatsappClient');
+    broadcast('event-reminder', event);
+  });
 
   // Start WhatsApp — pass the live message handler
   initClient(handleMessage).catch((err) =>
@@ -71,5 +78,6 @@ process.on('SIGINT', () => {
   const { shutdown } = require('./services/listenerService');
   const { shutdown: shutdownOcr } = require('./services/ocrService');
   shutdown();
+  stopEventReminderScheduler();
   shutdownOcr().finally(() => process.exit(0));
 });

@@ -6,7 +6,8 @@
   "scripts": {
     "server": "node server/index.js",
     "client": "cd client && npm run dev",
-    "dev": "concurrently \"npm run server\" \"npm run client\""
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "test": "node server/test_eventService.js && node server/test_businessOpportunityService.js"
   },
   "dependencies": {
     "chrono-node": "^2.10.1",

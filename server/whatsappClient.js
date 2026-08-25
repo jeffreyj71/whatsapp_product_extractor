@@ -3,6 +3,7 @@ const qrcode = require('qrcode');
 const path = require('path');
 const logger = require('./utils/logger');
 const { markReplied } = require('./services/replyTracker');
+const { findLocalChrome } = require('./utils/findChrome');
 require('dotenv').config();
 
 let client = null;
@@ -41,20 +42,27 @@ async function initClient(onMessage) {
   storedOnMessage = onMessage;
 
   const sessionPath = path.resolve(process.env.SESSION_DATA_PATH || '.wwebjs_auth');
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || findLocalChrome();
+
+  if (executablePath) {
+    logger.info(`Using local browser: ${executablePath}`);
+  } else {
+    logger.info('No local Chrome/Edge found — falling back to Puppeteer-managed browser');
+  }
 
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: sessionPath }),
-puppeteer: {
-  headless: true,
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-  protocolTimeout: 120000,
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-gpu',
-  ],
-},
+    puppeteer: {
+      headless: true,
+      protocolTimeout: 120000,
+      ...(executablePath ? { executablePath } : {}),
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    },
   });
 
   client.on('qr', async (qrString) => {

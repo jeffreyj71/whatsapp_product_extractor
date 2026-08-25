@@ -7,7 +7,8 @@
     "server": "node server/index.js",
     "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "test": "node server/test_eventService.js && node server/test_businessOpportunityService.js"
+    "test": "node server/test_eventService.js && node server/test_businessOpportunityService.js",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "chrono-node": "^2.10.1",
@@ -26,6 +27,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "patch-package": "^8.0.1"
   }
 }

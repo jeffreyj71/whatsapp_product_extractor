@@ -9,6 +9,8 @@ import SettingsPanel from './components/SettingsPanel.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import MissedChatReport from './components/MissedChatReport.jsx';
 import FeaturePlaceholder from './components/FeaturePlaceholder.jsx';
+import EventReminders from './components/EventReminders.jsx';
+import BusinessOpportunities from './components/BusinessOpportunities.jsx';
 
 export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
@@ -16,17 +18,38 @@ export default function App() {
   const [qrData, setQrData]                     = useState(null);
   const [rows, setRows]                         = useState([]);
   const [filePath, setFilePath]                 = useState(null);
-  const [stats, setStats]                       = useState({ sheet1Rows: 0, sheet2Rows: 0, sheet3Rows: 0 });
+  const [stats, setStats]                       = useState({ sheet1Rows: 0, sheet2Rows: 0, sheet3Rows: 0, sheet4Rows: 0 });
   const [showReset, setShowReset]               = useState(false);
   const [showSettings, setShowSettings]         = useState(false);
   const [activeView, setActiveView]             = useState('extractor');
   const [billEnabled, setBillEnabled]           = useState(false);
+  const [eventEnabled, setEventEnabled]         = useState(false);
   const [oppEnabled, setOppEnabled]             = useState(false);
   const [pendingChats, setPendingChats]         = useState({});
   const [billRows, setBillRows]                 = useState([]);
+  const [eventRows, setEventRows]               = useState([]);
+  const [opportunityRows, setOpportunityRows]   = useState([]);
+  const [eventNotifications, setEventNotifications] = useState([]);
+  const [missedChatsViewedAt, setMissedChatsViewedAt] = useState(() => Number(localStorage.getItem('missedChatsViewedAt')) || 0);
   const [productEnabled, setProductEnabled] = useState(true);
 
   const pendingCount = Object.values(pendingChats).filter((c) => c.awaitingReply).length;
+  const unseenMissedCount = Object.values(pendingChats).filter((c) => c.awaitingReply && c.lastIncomingAt > missedChatsViewedAt).length;
+
+  function openView(view) {
+    setActiveView(view);
+    if (view === 'missed') {
+      const viewedAt = Date.now();
+      localStorage.setItem('missedChatsViewedAt', String(viewedAt));
+      setMissedChatsViewedAt(viewedAt);
+    }
+  }
+
+  function showEventNotification(event) {
+    const notification = { id: `${event.id}-${event.reminderOffset}-${Date.now()}`, event };
+    setEventNotifications((prev) => [...prev, notification]);
+    window.setTimeout(() => setEventNotifications((prev) => prev.filter((item) => item.id !== notification.id)), 8000);
+  }
 
   const isConnected = connectionStatus === 'connected';
 
@@ -57,6 +80,16 @@ export default function App() {
     } catch (err) {
       console.error('Failed to update Bill Extractor toggle:', err.message);
       setBillEnabled(!next); // revert on failure
+    }
+  }
+
+  async function toggleEventEnabled(next) {
+    setEventEnabled(next);
+    try {
+      await api.setFeature('eventRemindersEnabled', next);
+    } catch (err) {
+      console.error('Failed to update Event Reminders toggle:', err.message);
+      setEventEnabled(!next);
     }
   }
 
@@ -91,6 +124,7 @@ export default function App() {
       reset: (data) => {
         setRows([]);
         setBillRows([]);
+        setEventRows([]);
         if (data.filePath) setFilePath(data.filePath);
         if (data.stats)    setStats(data.stats);
       },
@@ -111,6 +145,13 @@ export default function App() {
         if (data.filePath) setFilePath(data.filePath);
         if (data.stats)    setStats(data.stats);
       },
+      'event-detected': (data) => {
+        setEventRows((prev) => [...prev, data]);
+      },
+      'event-reminder': showEventNotification,
+      'business-opportunity': (data) => {
+        setOpportunityRows((prev) => [data, ...prev.filter((item) => item.id !== data.id)]);
+      },
     });
 
     api.getPending().then(({ pending }) => {
@@ -123,6 +164,7 @@ export default function App() {
     // sidebar would always show "off" on page refresh even if it was left on.
     api.getFeatures().then((flags) => {
       setBillEnabled(!!flags.billExtractorEnabled);
+      setEventEnabled(!!flags.eventRemindersEnabled);
       setOppEnabled(!!flags.businessOpportunitiesEnabled);
     }).catch(() => {});
 
@@ -155,10 +197,12 @@ export default function App() {
         <div style={s.body}>
           <Sidebar
             activeView={activeView}
-            setActiveView={setActiveView}
-            pendingCount={pendingCount}
+            setActiveView={openView}
+            pendingCount={unseenMissedCount}
             billEnabled={billEnabled}
             setBillEnabled={toggleBillEnabled}
+            eventEnabled={eventEnabled}
+            setEventEnabled={toggleEventEnabled}
             oppEnabled={oppEnabled}
             setOppEnabled={toggleOppEnabled}
           />
@@ -176,7 +220,7 @@ export default function App() {
                 </div>
               </>
             )}
-            {activeView === 'missed' && <MissedChatReport pendingChats={pendingChats} />}
+            {activeView === 'missed' && <MissedChatReport pendingChats={pendingChats} unseenSince={missedChatsViewedAt} />}
             {activeView === 'bill' && (
               <FeaturePlaceholder
                 icon="🧾"
@@ -189,13 +233,14 @@ export default function App() {
                 }
               />
             )}
-            {activeView === 'opportunities' && (
-              <FeaturePlaceholder
-                icon="💡"
-                title="Business Opportunities"
-                enabled={oppEnabled}
-                description="Will surface chats that look like leads or business opportunities based on message content."
+            {activeView === 'events' && (
+              <EventReminders
+                events={eventRows}
+                onDemoReminder={showEventNotification}
               />
+            )}
+            {activeView === 'opportunities' && (
+              <BusinessOpportunities opportunities={opportunityRows} enabled={oppEnabled} />
             )}
           </div>
         </div>
@@ -204,6 +249,11 @@ export default function App() {
       <footer style={s.footer}>
         ⚠️ Only monitor chats you are authorised to access. All data stays on your local machine.
       </footer>
+      <div style={s.toastArea} aria-live="polite">
+        {eventNotifications.map(({ id, event }) => (
+          <div key={id} style={s.toast}>📅 {event.title || 'Event'} starts in {event.reminderOffset} minutes.</div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -241,6 +291,8 @@ const s = {
   logo:        { fontSize: 16, fontWeight: 700, color: '#25d366' },
   headerRight: { display: 'flex', alignItems: 'center', gap: 8 },
   pendingPill: { fontSize: 12, fontWeight: 600, color: '#f85149', background: '#2d1416', border: '1px solid #6e2020', borderRadius: 12, padding: '3px 10px' },
+  toastArea: { position: 'fixed', right: 20, bottom: 20, zIndex: 20, display: 'flex', flexDirection: 'column', gap: 8 },
+  toast: { background: '#1f2c22', color: '#e6edf3', border: '1px solid #25d366', borderRadius: 8, padding: '11px 14px', fontSize: 13, boxShadow: '0 6px 18px rgba(0,0,0,.35)' },
   dot:         { width: 10, height: 10, borderRadius: '50%', display: 'inline-block' },
   statusText:  { fontSize: 13, color: '#8b949e' },
   body:          { display: 'flex', flex: 1, overflow: 'hidden' },

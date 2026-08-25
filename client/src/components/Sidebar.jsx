@@ -4,6 +4,7 @@ const NAV_ITEMS = [
   { key: 'extractor',     label: 'Product Extractor',    icon: '📦', toggleable: true },
   { key: 'missed',        label: 'Missed Chats',   icon: '⏰', toggleable: false },
   { key: 'bill',          label: 'Bill Extractor',       icon: '🧾', toggleable: true },
+  { key: 'events',        label: 'Event Reminders',      icon: '📅', toggleable: true },
   { key: 'opportunities', label: 'Business Opportunities', icon: '💡', toggleable: true },
 ];
 
@@ -12,11 +13,13 @@ export default function Sidebar({
   pendingCount,
   productEnabled, setProductEnabled,
   billEnabled, setBillEnabled,
+  eventEnabled, setEventEnabled,
   oppEnabled, setOppEnabled,
 }) {
   const toggleState = {
     extractor: [productEnabled, setProductEnabled],
     bill: [billEnabled, setBillEnabled],
+    events: [eventEnabled, setEventEnabled],
     opportunities: [oppEnabled, setOppEnabled],
   };
 

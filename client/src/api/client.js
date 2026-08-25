@@ -21,6 +21,9 @@ export const api = {
   getSettings:  () => apiFetch('/settings'),
   saveSettings: (data) => apiFetch('/settings', { method: 'POST', body: JSON.stringify(data) }),
   getPending:   () => apiFetch('/pending'),
+  getEvents:    () => apiFetch('/events'),
+  getOpportunities: () => apiFetch('/opportunities'),
+  saveEventReminders: (id, reminderOffsets) => apiFetch(`/events/${id}/reminders`, { method: 'PATCH', body: JSON.stringify({ reminderOffsets }) }),
   getFeatures:  () => apiFetch('/features'),
   setFeature:   (name, enabled) => apiFetch('/features', { method: 'POST', body: JSON.stringify({ name, enabled }) }),
 };
